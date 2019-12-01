@@ -1,18 +1,40 @@
 package com.payments.paystack;
 
+import com.payments.paystack.PaystackSetup;
+
+import java.io.IOException;
+import java.util.concurrent.TimeUnit;
+
+import okhttp3.Interceptor;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.Request.Builder;
+
 import retrofit2.Call;
 
-public class PaystackService {
-    protected static PaystackService instance;
-
-    public static final PaystackService getInstance() {
-        return instance;
-    }
+public abstract class PaystackService<T> {
 
     @SuppressWarnings({ "unchecked", "rawtypes" })
-    public static final IResult<?> enqueue(final Call<?> call, final IResult resultCallback) {
+    public final IResult<?> enqueue(final Call<?> call, final IResult resultCallback) {
         call.enqueue(resultCallback);
         return resultCallback;
     }
 
+    public abstract T getServiceAPI();
+
+    protected final OkHttpClient getHttpClient() {
+        return new OkHttpClient.Builder().readTimeout(180, TimeUnit.SECONDS).writeTimeout(180, TimeUnit.SECONDS)
+                .connectTimeout(180, TimeUnit.SECONDS).addInterceptor(new Interceptor() {
+                    @Override
+                    public Response intercept(Chain chain) throws IOException {
+                        String authToken = PaystackSetup.getAuthToken();
+                        Request originalRequest = chain.request();
+                        Builder newRequestBuilder = originalRequest.newBuilder().addHeader("Authorization",
+                                authToken == null ? "" : "Bearer " + authToken);
+                        Response response = chain.proceed(newRequestBuilder.build());
+                        return response;
+                    }
+                }).build();
+    }
 }
